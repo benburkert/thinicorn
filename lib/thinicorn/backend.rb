@@ -34,5 +34,12 @@ class Thinicorn
       stop
     end
 
+    def set_sockopts(sock)
+      sock.close_on_exec = false
+      sock.listen(1024)
+
+      sock
+    end
+
   end
 end

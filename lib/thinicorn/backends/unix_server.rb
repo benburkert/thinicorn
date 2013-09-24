@@ -7,11 +7,7 @@ class Thinicorn
     end
 
     def create_socket
-      sock = UNIXServer.open(@socket)
-      sock.close_on_exec = false
-      sock.listen(100)
-
-      sock
+      set_sockopts(UNIXServer.open(@socket))
     end
 
     def connect

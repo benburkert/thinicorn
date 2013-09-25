@@ -14,6 +14,7 @@ class Thinicorn
       @pipe  = ENV[PIPE_FD].to_i   unless ENV[PIPE_FD].nil?
 
       @klass = connection_class
+      @state = :starting
 
       @pid = opts[:pid]
       @log = opts[:log]
@@ -24,6 +25,8 @@ class Thinicorn
       write_pidfile
 
       trap(:USR2) { reexec }
+
+      $0 = procline
     end
 
     def connect
@@ -39,10 +42,15 @@ class Thinicorn
         io = IO.for_fd(@pipe)
         io.write_nonblock('+')
       end
+
+      @state          = :running
+      @procline_timer = EventMachine::PeriodicTimer.new(5) { $0 = procline }
     end
 
     def reexec
       log ">> SIGUSR2 received - starting graceful restart"
+
+      @state = :spawning
 
       @reexec_at = Time.now.to_i
 
@@ -108,6 +116,8 @@ class Thinicorn
     def restart_succeded
       log ">> Child is up - finishing graceful restart"
 
+      @state = :stopping
+
       stop
     end
 
@@ -117,6 +127,12 @@ class Thinicorn
       Process.kill(:KILL, @child_pid)
 
       @child_pid = nil
+
+      @state = :running
+    end
+
+    def procline
+      "thinicorn [%s] (%s): %5d conns" % [self, @state.to_s.upcase, @connections.size]
     end
   end
 

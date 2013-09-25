@@ -3,6 +3,7 @@ class Thinicorn
     include Thin::Logging
 
     SERVER_FD = 'THINICORN_SERVER_FD'
+    PIPE_FD   = 'THINICORN_PIPE_FD'
 
     def initialize(*args)
       opts = args.last.is_a?(Hash) ? args.pop : {}
@@ -10,6 +11,8 @@ class Thinicorn
       super(*args)
 
       @fd    = ENV[SERVER_FD].to_i unless ENV[SERVER_FD].nil?
+      @pipe  = ENV[PIPE_FD].to_i   unless ENV[PIPE_FD].nil?
+
       @klass = connection_class
 
       @pid = opts[:pid]
@@ -31,6 +34,11 @@ class Thinicorn
       EventMachine.attach_server @fd, @klass, &method(:initialize_connection)
 
       @signature = EventMachine.instance_eval{@acceptors.keys.first}
+
+      if @pipe
+        io = IO.for_fd(@pipe)
+        io.write_nonblock('+')
+      end
     end
 
     def reexec
@@ -38,11 +46,18 @@ class Thinicorn
 
       @reexec_at = Time.now.to_i
 
+      pipe_r, pipe_w = create_pipe
+
+      ENV[PIPE_FD] = pipe_w.fileno.to_s
+
       swap_pidfile if @pid
 
-      POSIX::Spawn::spawn(Thinicorn.command)
+      @child_pid = POSIX::Spawn::spawn(Thinicorn.command)
 
-      stop
+      EventMachine.attach(pipe_r, WaitForChild) do |conn|
+        conn.on_timeout(&method(:restart_failed))
+        conn.on_readable(&method(:restart_succeded))
+      end
     end
 
     def set_sockopts(sock)
@@ -78,5 +93,56 @@ class Thinicorn
       at_exit { File.unlink(path) }
     end
 
+    def create_pipe
+      r, w = IO.pipe
+
+      w.close_on_exec = false
+      w.fcntl Fcntl::F_SETFD, w.fcntl(Fcntl::F_GETFD) & ~Fcntl::FD_CLOEXEC
+
+      r.close_on_exec = true
+      r.fcntl Fcntl::F_SETFD, r.fcntl(Fcntl::F_GETFD) & Fcntl::FD_CLOEXEC
+
+      return r, w
+    end
+
+    def restart_succeded
+      log ">> Child is up - finishing graceful restart"
+
+      stop
+    end
+
+    def restart_failed
+      log ">> Child start timed out - aborting graceful restart"
+
+      Process.kill(:KILL, @child_pid)
+
+      @child_pid = nil
+    end
   end
+
+  class WaitForChild < EventMachine::Connection
+    attr_accessor :state
+
+    def on_timeout(timeout = 5, &block)
+      @timeout_block = block
+      EventMachine::Timer.new(timeout, &method(:timeout))
+    end
+
+    def on_readable(&block)
+      @readable_block = block
+    end
+
+    def timeout
+      @state ||= :timeout
+
+      @timeout_block.call if @state == :timeout
+    end
+
+    def receive_data(*)
+      @state ||= :readable
+
+      @readable_block.call if @state == :readable
+    end
+  end
+
 end

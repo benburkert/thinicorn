@@ -8,15 +8,28 @@ class Thinicorn
   autoload :TcpServer,  'thinicorn/backends/tcp_server'
   autoload :UnixServer, 'thinicorn/backends/unix_server'
 
-  def self.new(host, port, _ = nil)
-    if unix_socket?(host)
-      UnixServer.new(host)
-    else
-      TcpServer.new(host, port)
-    end
-  end
+  class << self
+    attr_accessor :argv, :cmd
+    attr_writer   :daemonize
 
-  def self.unix_socket?(path)
-    path =~ %r{/}
+    def new(host, port, opts = {})
+      if unix_socket?(host)
+        UnixServer.new(host, opts)
+      else
+        TcpServer.new(host, port, opts)
+      end
+    end
+
+    def unix_socket?(path)
+      path =~ %r{/}
+    end
+
+    def daemonize?
+      @daemonize
+    end
+
+    def command
+      [@cmd, *@argv].join(' ')
+    end
   end
 end

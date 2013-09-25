@@ -1,0 +1,19 @@
+#!/usr/bin/env ruby
+# Thin command line interface script.
+# Run <tt>thinicorn -h</tt> to get more usage.
+
+require 'thinicorn'
+
+if ARGV.include?('--daemonize')
+  Thinicorn.daemonize = true
+  ARGV.delete('--daemonize')
+end
+
+unless ARGV.include?('--backend')
+  ARGV.push('--backend', 'Thinicorn')
+end
+
+Thinicorn.argv = ARGV.dup
+Thinicorn.cmd  = $0.dup
+
+Thin::Runner.new(ARGV).run!

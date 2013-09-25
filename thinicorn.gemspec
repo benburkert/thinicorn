@@ -10,7 +10,9 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = "thinicorn"
 
+  s.executables   = %w( thinicorn )
   s.files         = Dir['lib/**/*.rb']
+  s.bindir        = 'bin'
   s.require_paths = ["lib"]
 
   s.add_dependency 'thin'

@@ -39,9 +39,7 @@ class Thinicorn
 
       ENV[SERVER_FD] = @fd.to_s
 
-      EventMachine.attach_server sock, @klass, &method(:initialize_connection)
-
-      @signature = EventMachine.instance_eval{@acceptors.keys.first}
+      @signature = EventMachine.attach_server sock, @klass, &method(:initialize_connection)
 
       if @pipe
         io = IO.for_fd(@pipe)

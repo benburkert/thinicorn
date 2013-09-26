@@ -30,11 +30,16 @@ class Thinicorn
     end
 
     def connect
-      @fd = create_socket.fileno if @fd.nil?
+      if @fd.nil?
+        sock = create_socket
+        @fd  = sock.fileno
+      else
+        sock = Socket.for_fd(@fd)
+      end
 
       ENV[SERVER_FD] = @fd.to_s
 
-      EventMachine.attach_server @fd, @klass, &method(:initialize_connection)
+      EventMachine.attach_server sock, @klass, &method(:initialize_connection)
 
       @signature = EventMachine.instance_eval{@acceptors.keys.first}
 

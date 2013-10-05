@@ -31,13 +31,13 @@ class Thinicorn
 
       # highly portable, but off by default because we don't do keepalive
       if defined?(TCP_NODELAY)
-        sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
+        sock.setsockopt(Socket::IPPROTO_TCP, TCP_NODELAY, 1)
       end
 
       if defined?(TCP_CORK) # Linux
-        sock.setsockopt(IPPROTO_TCP, TCP_CORK, 0)
+        sock.setsockopt(Socket::IPPROTO_TCP, TCP_CORK, 0)
       elsif defined?(TCP_NOPUSH) # TCP_NOPUSH is untested (FreeBSD)
-        sock.setsockopt(IPPROTO_TCP, TCP_NOPUSH, 0)
+        sock.setsockopt(Socket::IPPROTO_TCP, TCP_NOPUSH, 0)
       end
 
       # No good reason to ever have deferred accepts off
@@ -45,9 +45,9 @@ class Thinicorn
       if defined?(TCP_DEFER_ACCEPT)
         # this differs from nginx, since nginx doesn't allow us to
         # configure the the timeout...
-        sock.setsockopt(SOL_TCP, TCP_DEFER_ACCEPT, 1)
+        sock.setsockopt(Socket::SOL_TCP, TCP_DEFER_ACCEPT, 1)
       elsif respond_to?(:accf_arg)
-        sock.setsockopt(SOL_SOCKET, SO_ACCEPTFILTER, accf_arg('httpready'))
+        sock.setsockopt(Socket::SOL_SOCKET, SO_ACCEPTFILTER, accf_arg('httpready'))
       end
 
       sock
